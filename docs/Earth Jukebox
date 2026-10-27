@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Earth Jukebox</title>
+<style>
+:root{--bg:#e4ebe6;--panel:#f4f7f4;--ink:#10302c;--mute:#4d6661;--line:#9db3ad;--acc:#f2b632;--accink:#10302c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1c22;--panel:#14292f;--ink:#e3f0ea;--mute:#93b0a8;--line:#2f4c52;--acc:#f2b632;--accink:#10302c}}
+:root[data-theme="dark"]{--bg:#0d1c22;--panel:#14292f;--ink:#e3f0ea;--mute:#93b0a8;--line:#2f4c52;--acc:#f2b632;--accink:#10302c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:20px 16px 40px}
+h1{font:700 2.1rem/1.1 Georgia,"Iowan Old Style",serif;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 18px;max-width:62ch}
+.deck{display:grid;grid-template-columns:230px 1fr;gap:16px}
+@media(max-width:720px){.deck{grid-template-columns:1fr}}
+.tracks{display:flex;flex-direction:column;gap:8px}
+.tracks button{all:unset;cursor:pointer;display:block;padding:10px 12px;border:2px solid var(--line);border-radius:10px;background:var(--panel)}
+.tracks button b{display:block}
+.tracks button span{color:var(--mute);font-size:.85rem}
+.tracks button[aria-checked=true]{border-color:var(--acc);box-shadow:inset 6px 0 0 var(--acc)}
+.stage{background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:12px}
+.frame{position:relative;line-height:0;border-radius:6px;overflow:hidden}
+canvas{width:100%;height:auto;display:block;image-rendering:pixelated;aspect-ratio:2/1}
+#head{position:absolute;top:0;bottom:0;width:3px;background:var(--acc);box-shadow:0 0 0 1px #0007;left:0}
+.row{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:12px}
+button.b{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:2px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
+button.b.go{background:var(--acc);color:var(--accink);border-color:var(--acc);min-width:92px}
+label{display:flex;gap:8px;align-items:center;font-size:.92rem}
+input[type=range]{accent-color:var(--acc)}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.cap{margin:12px 0 0;padding:10px 12px;border-left:5px solid var(--acc);background:var(--bg);border-radius:0 6px 6px 0;min-height:3.2em}
+.read{color:var(--mute);font-size:.85rem;font-variant-numeric:tabular-nums;margin:6px 0 0}
+details{margin-top:16px;color:var(--mute);font-size:.9rem}
+kbd{background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.bar{height:10px;border-radius:5px;flex:1;min-width:120px}
+.sr{position:absolute;left:-9999px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+<h1>Earth Jukebox</h1>
+<p class="sub">Each map is played as music, left to right. Higher value, higher pitch. West is in your left ear, east in your right. Rougher sound means more variation in that slice of the map.</p>
+
+<div class="deck">
+  <div class="tracks" role="radiogroup" aria-label="Tracks" id="tracks"></div>
+  <section class="stage" aria-label="Player">
+    <div class="frame"><canvas id="cv" width="72" height="36" role="img" aria-label="Map of the selected dataset"></canvas><div id="head"></div></div>
+    <div class="row">
+      <button class="b go" id="play" aria-label="Play">Play</button>
+      <label>Year <input type="range" id="yr" min="2000" max="2025" value="2025" aria-valuetext="2025"> <output id="yro">2025</output></label>
+      <label>Scrub <input type="range" id="pos" min="0" max="71" value="0" aria-label="Playhead position, west to east"></label>
+    </div>
+    <div class="row">
+      <label>Speed <select id="spd" aria-label="Playback speed"><option value=".5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label>
+      <label><input type="checkbox" id="beg" checked> Beginner mode (simple melody)</label>
+    </div>
+    <div class="row" aria-label="Pitch legend">
+      <span>Legend</span>
+      <button class="b" id="lo">Hear low</button>
+      <div class="bar" id="bar" aria-hidden="true"></div>
+      <button class="b" id="hi">Hear high</button>
+    </div>
+    <p class="cap" id="cap" aria-live="polite"></p>
+    <p class="read" id="read" aria-hidden="true"></p>
+  </section>
+</div>
+
+<details>
+<summary>Keyboard shortcuts and about the data</summary>
+<p><kbd>Space</kbd> play or pause · <kbd>←</kbd> <kbd>→</kbd> move playhead · <kbd>↑</kbd> <kbd>↓</kbd> change year · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> pick track.</p>
+<p>This prototype uses synthetic grids shaped like NASA Earth Information Center datasets, so the sounds are illustrative, not measurements. To use real data, replace <code>makeGrid()</code> with a function that returns a 72×36 array for the chosen year.</p>
+</details>
+</main>
+
+<script>
+const W=72,H=36;
+const T={
+ sst:{name:'Sea surface temperature',blurb:'Warm pad, ocean',cmap:[[24,48,120],[236,236,214],[214,60,38]],wave:'triangle',dur:.42,base:130,feat:'mean',unit:'warmer'},
+ ice:{name:'Sea ice',blurb:'Bright bell, poles',cmap:[[14,40,80],[120,170,210],[250,252,255]],wave:'sine',dur:.5,base:261,feat:'mean',unit:'more ice'},
+ fire:{name:'Wildfire',blurb:'Sharp pluck, land',cmap:[[40,34,30],[220,110,30],[255,236,120]],wave:'sawtooth',dur:.16,base:196,feat:'max',unit:'more fire'}
+};
+const land=(x,y)=>Math.sin(x*11+1.3)*Math.cos(y*8+.4)+.6*Math.sin(x*4-y*5)>.85&&y>.08&&y<.92;
+const gauss=(x,y,cx,cy,s)=>Math.exp(-((x-cx)**2+(y-cy)**2)/(2*s*s));
+function makeGrid(k,yr){
+ const g=new Float32Array(W*H),w=(yr-2000)/25;
+ for(let j=0;j<H;j++)for(let i=0;i<W;i++){
+  const x=i/(W-1),y=j/(H-1),lat=Math.abs(.5-y)*2,L=land(x,y);let v;
+  if(k==='sst'){ if(L){v=NaN}else v=Math.min(1,Math.max(0,.9-.8*lat**1.3+.18*w+.2*gauss(x,y,.75,.5,.08)*(yr%4===0?1:.3)));}
+  else if(k==='ice'){ const edge=.78+.1*w; v=lat>edge?Math.min(1,(lat-edge)/(1-edge)*(1-.35*w)+.15):0; if(L&&lat<.78)v=NaN; }
+  else { if(!L)v=NaN; else {v=0;[[.2,.35,.05],[.28,.62,.05],[.55,.55,.06],[.6,.4,.04],[.85,.7,.05],[.8,.3,.04]].forEach(([cx,cy,s],n)=>{v+=gauss(x,y,cx,cy,s)*(.35+.65*w)*(.6+.4*Math.sin(n*2+yr))});v=Math.min(1,v)}}
+  g[j*W+i]=v;
+ }
+ return g;
+}
+const $=id=>document.getElementById(id);
+const cv=$('cv'),cx=cv.getContext('2d');
+let cur='sst',col=0,playing=false,timer=null,ctx=null,grid,base2000;
+function colorAt(k,v){const c=T[k].cmap,t=v*(c.length-1),a=Math.min(c.length-2,Math.floor(t)),f=t-a;return c[a].map((n,i)=>Math.round(n+(c[a+1][i]-n)*f))}
+function draw(){
+ cx.clearRect(0,0,W,H);
+ for(let j=0;j<H;j++)for(let i=0;i<W;i++){const v=grid[j*W+i];
+  cx.fillStyle=isNaN(v)?'#5b6b66':'rgb('+colorAt(cur,v)+')';cx.fillRect(i,j,1,1);}
+ const bar=$('bar');bar.style.background='linear-gradient(90deg,'+[0,.5,1].map(v=>'rgb('+colorAt(cur,v)+')').join(',')+')';
+}
+function mean(g){let s=0,n=0;g.forEach(v=>{if(!isNaN(v)){s+=v;n++}});return s/n}
+function feats(c){let s=0,n=0,m=0,q=0;for(let j=0;j<H;j++){const v=grid[j*W+c];if(isNaN(v))continue;s+=v;q+=v*v;n++;m=Math.max(m,v)}
+ if(!n)return{rest:true};const mu=s/n;return{mean:mu,max:m,spread:Math.sqrt(Math.max(0,q/n-mu*mu)),rest:false}}
+const PENT=[0,2,4,7,9];
+function freqFor(v,k){const t=T[k];if($('beg').checked){const d=Math.round(v*14);return t.base*2**((PENT[d%5]+12*Math.floor(d/5))/12)}return t.base*2**(v*2)}
+function tone(f,{pan=0,gain=.2,spread=0,wave='sine',dur=.3}){
+ if(!ctx)ctx=new (window.AudioContext||window.webkitAudioContext)();
+ if(ctx.state==='suspended')ctx.resume();
+ const t=ctx.currentTime,out=ctx.createGain(),p=ctx.createStereoPanner?ctx.createStereoPanner():null;
+ out.gain.setValueAtTime(0,t);out.gain.linearRampToValueAtTime(gain,t+.02);out.gain.exponentialRampToValueAtTime(.0008,t+dur);
+ if(p){p.pan.value=pan;out.connect(p);p.connect(ctx.destination)}else out.connect(ctx.destination);
+ [0,1].forEach(n=>{if(n&&spread<.02)return;const o=ctx.createOscillator();o.type=wave;o.frequency.value=f;o.detune.value=n?spread*80:0;o.connect(out);o.start(t);o.stop(t+dur+.05)});
+}
+function playCol(c){
+ const f=feats(c),t=T[cur];if(f.rest)return;
+ const v=t.feat==='max'?f.max:f.mean;
+ if(cur==='fire'&&v<.08)return;
+ tone(freqFor(v,cur),{pan:(c/(W-1))*2-1,gain:cur==='fire'?.08+.18*v:.16,spread:f.spread,wave:t.wave,dur:t.dur});
+ const hz=Math.round(freqFor(v,cur)),lon=Math.round(-180+c/(W-1)*360);
+ $('read').textContent='Longitude '+Math.abs(lon)+'°'+(lon<0?'W':'E')+' · value '+v.toFixed(2)+' · '+hz+' Hz';
+}
+function setCol(c){col=c;$('head').style.left=(c/W*100)+'%';$('pos').value=c}
+function step(){playCol(col);if(col>=W-1){caption();setCol(0)}else setCol(col+1)}
+function interval(){return ($('beg').checked?200:120)/parseFloat($('spd').value)}
+function start(){playing=true;$('play').textContent='Pause';$('play').setAttribute('aria-label','Pause');caption();timer=setInterval(step,interval())}
+function stop(){playing=false;$('play').textContent='Play';$('play').setAttribute('aria-label','Play');clearInterval(timer)}
+function restart(){if(playing){clearInterval(timer);timer=setInterval(step,interval())}}
+function caption(){
+ const yr=+$('yr').value,m=mean(grid),m0=mean(base2000),d=m-m0,t=T[cur];
+ let s=t.name+', '+yr+'. ';
+ s+=Math.abs(d)<.02?'About the same as in 2000.':'Compared with 2000, the pitch is '+(d>0?'higher':'lower')+', meaning '+(d>0?t.unit:'less of it')+'.';
+ if(cur==='sst')s+=' Listen for the warm patch near the equator in the east.';
+ if(cur==='ice')s+=' Sound appears only near the polar edges of the map; silence in the middle means open ocean.';
+ if(cur==='fire')s+=' Short plucks mark burning regions; silence means no detected fire.';
+ $('cap').textContent=s;
+}
+function load(){const yr=+$('yr').value;grid=makeGrid(cur,yr);base2000=makeGrid(cur,2000);$('yro').textContent=yr;$('yr').setAttribute('aria-valuetext',String(yr));draw();caption()}
+function pick(k){cur=k;document.querySelectorAll('#tracks button').forEach(b=>b.setAttribute('aria-checked',b.dataset.k===k));$('cv').setAttribute('aria-label','Map of '+T[k].name.toLowerCase());setCol(0);load()}
+Object.entries(T).forEach(([k,t],n)=>{const b=document.createElement('button');b.dataset.k=k;b.setAttribute('role','radio');b.tabIndex=0;b.innerHTML='<b>'+t.name+'</b><span>'+t.blurb+'</span>';b.onclick=()=>pick(k);$('tracks').appendChild(b)});
+$('play').onclick=()=>playing?stop():start();
+$('yr').oninput=load;$('pos').oninput=e=>setCol(+e.target.value);
+$('spd').onchange=restart;$('beg').onchange=restart;
+$('lo').onclick=()=>tone(freqFor(0,cur),{wave:T[cur].wave,dur:.8,gain:.2});
+$('hi').onclick=()=>tone(freqFor(1,cur),{wave:T[cur].wave,dur:.8,gain:.2});
+document.addEventListener('keydown',e=>{
+ const tg=e.target.tagName;if(tg==='INPUT'||tg==='SELECT')return;
+ if(e.key===' '&&tg!=='BUTTON'){e.preventDefault();$('play').click()}
+ else if(e.key==='ArrowRight'){setCol(Math.min(W-1,col+1));playCol(col)}
+ else if(e.key==='ArrowLeft'){setCol(Math.max(0,col-1));playCol(col)}
+ else if(e.key==='ArrowUp'){$('yr').value=Math.min(2025,+$('yr').value+1);load()}
+ else if(e.key==='ArrowDown'){$('yr').value=Math.max(2000,+$('yr').value-1);load()}
+ else if('123'.includes(e.key)&&e.key)pick(Object.keys(T)[+e.key-1]);
+});
+pick('sst');
+</script>
+</body>
+</html>
